@@ -1,0 +1,103 @@
+/*
+  AIOps Console - Design Tokens
+  --------------------------------
+  Direction: "mission control at 2am" - the console an SRE actually keeps
+  open on a second monitor. Deep slate (not pure black, it needs to survive
+  hours of eye time), a single signal-amber accent reserved for things that
+  actually need attention, and a cold teal for "this is fine" states. Data
+  is set in monospace so digits align in columns the way they do in a real
+  terminal; UI chrome is a plain grotesque so it gets out of the way.
+*/
+
+:root {
+  /* Surface */
+  --bg-void: #0b0f14;
+  --bg-panel: #11161d;
+  --bg-panel-raised: #161d26;
+  --bg-inset: #0d1218;
+  --border-hairline: #232b36;
+  --border-hairline-strong: #2e3947;
+
+  /* Text */
+  --text-primary: #e6ebf1;
+  --text-secondary: #8b98a9;
+  --text-tertiary: #5a6578;
+
+  /* Signal colors - meaningful, not decorative */
+  --signal-healthy: #35d0a1;
+  --signal-healthy-dim: #163b31;
+  --signal-warning: #f0a83c;
+  --signal-warning-dim: #3d2f14;
+  --signal-critical: #f0563c;
+  --signal-critical-dim: #3d1a14;
+  --signal-offline: #5a6578;
+  --signal-offline-dim: #1c212a;
+  --signal-info: #4c8fe0;
+
+  /* Accent - amber, reserved for attention/actions */
+  --accent: #f0a83c;
+  --accent-strong: #ffbf5c;
+
+  /* Type */
+  --font-mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-void);
+  background-image: radial-gradient(circle at 15% 0%, rgba(76, 143, 224, 0.06), transparent 40%);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--bg-void);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Focus visibility - accessibility floor */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+}
