@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-white/10;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-base-900 text-slate-100 antialiased;
+    background-image: theme("backgroundImage.grid-glow");
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::selection {
+    @apply bg-brand-500/40 text-white;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-base-600 rounded-full border-2 border-solid border-base-900;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-base-500;
+  }
+
+  :focus-visible {
+    @apply outline outline-2 outline-brand-400 outline-offset-2;
+  }
+}
+
+@layer components {
+  /* Glass panel — the core surface used across the whole dashboard */
+  .glass {
+    @apply relative bg-white/[0.035] backdrop-blur-xl border border-white/10 shadow-glass;
+  }
+
+  .glass-strong {
+    @apply relative bg-white/[0.06] backdrop-blur-2xl border border-white/10 shadow-glass;
+  }
+
+  /* Shimmer skeleton background */
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0.09) 20%,
+      rgba(255, 255, 255, 0.04) 40%
+    );
+    background-size: 800px 100%;
+    @apply animate-shimmer;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+}

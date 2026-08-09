@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: aiops-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aiops_user
+      POSTGRES_PASSWORD: aiops_password
+      POSTGRES_DB: aiops_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - aiops_pg_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/1_schema.sql
+      - ./database/seed_data.sql:/docker-entrypoint-initdb.d/2_seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiops_user -d aiops_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: aiops-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://aiops_user:aiops_password@db:5432/aiops_db
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
+      ENVIRONMENT: production
+      DEBUG: "false"
+      CORS_ORIGINS: '["http://localhost:3000","http://localhost:80"]'
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    container_name: aiops-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+  monitoring-agent:
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+    container_name: aiops-agent-demo
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      AIOPS_API_URL: http://backend:8000/api/v1
+      AIOPS_API_KEY: demo-api-key-12345
+      AIOPS_COLLECTION_INTERVAL: "15"
+
+volumes:
+  aiops_pg_data:
