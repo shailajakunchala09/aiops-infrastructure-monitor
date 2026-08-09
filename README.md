@@ -16,24 +16,6 @@ single engineer to build, test, and operate.
 ---
 
 ## Why this project
-# AIOps Infrastructure Monitoring & Incident Management Platform
-
-An enterprise-style AIOps platform for monitoring server infrastructure,
-analyzing application logs, and managing operational incidents — built to
-demonstrate the same architectural patterns used in production monitoring
-tools like Datadog, New Relic, and Dynatrace, at a scope appropriate for a
-single engineer to build, test, and operate.
-
-[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-blue)](.github/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.12-blue)](backend/requirements.txt)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)](backend/requirements.txt)
-[![React](https://img.shields.io/badge/React-18-61DAFB)](frontend/package.json)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)](database/schema.sql)
-
----
-
-## Why this project
 
 Most portfolio monitoring apps display metrics. This one **reasons about
 them**: it evaluates every incoming metric and log line against configurable
@@ -169,3 +151,4 @@ build check and a Docker image build validation stage.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+DEVELOPER : KUNCHALA SHAILAJA
