@@ -113,9 +113,8 @@ cp backend/.env.example backend/.env
 
 docker compose up --build
 ```
-
-- Dashboard: http://localhost:3000
-- API + Swagger docs: http://localhost:8000/api/docs
+Dashboard: https://aiops-frontend-zw3x.onrender.com
+API + Swagger docs: https://aiops-infrastructure-monitor.onrender.com/api/docs
 
 Full setup instructions (Docker and non-Docker paths):
 [`documentation/installation-guide.md`](documentation/installation-guide.md).
