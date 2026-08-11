@@ -59,7 +59,7 @@ services:
     depends_on:
       - backend
     environment:
-      AIOPS_API_URL: http://backend:8000/api/v1
+      AIOPS_API_URL: https://aiops-infrastructure-monitor.onrender.com/api/v1
       AIOPS_API_KEY: demo-api-key-12345
       AIOPS_COLLECTION_INTERVAL: "15"
 
