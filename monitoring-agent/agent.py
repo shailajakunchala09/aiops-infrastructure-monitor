@@ -18,7 +18,9 @@ sidecar on the monitored host.
 import logging
 import os
 import time
+import threading
 from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import psutil
 import requests
@@ -133,10 +135,40 @@ def classify_and_forward_log_lines(config: AgentConfig) -> None:
         elif "WARN" in upper:
             send_log(config, "WARNING", line)
 
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/healthz":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK")
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, format, *args):
+        return
+
+
+def start_health_server():
+    port = int(os.environ.get("PORT", "10000"))
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    logger.info(f"Health server listening on port {port}")
+    server.serve_forever()
 
 def run() -> None:
     config = AgentConfig.from_env()
-    logger.info(f"Starting AIOps agent -> {config.api_url} (interval={config.collection_interval_seconds}s)")
+
+    health_thread = threading.Thread(
+        target=start_health_server,
+        daemon=True,
+    )
+    health_thread.start()
+
+    logger.info(
+        f"Starting AIOps agent -> {config.api_url} "
+        f"(interval={config.collection_interval_seconds}s)"
+    )
 
     while True:
         try:
