@@ -8,9 +8,17 @@ from app.core.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.server import Server
 from app.models.user import User, UserRole
-from app.schemas.server import ServerCreate, ServerOut, ServerRegisteredOut, ServerUpdate
+from app.schemas.server import (
+    ServerCreate,
+    ServerOut,
+    ServerRegisteredOut,
+    ServerUpdate,
+)
 
-router = APIRouter(prefix="/servers", tags=["Infrastructure Monitoring"])
+router = APIRouter(
+    prefix="/servers",
+    tags=["Infrastructure Monitoring"],
+)
 
 
 @router.post(
@@ -19,32 +27,83 @@ router = APIRouter(prefix="/servers", tags=["Infrastructure Monitoring"])
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_roles([UserRole.ADMIN, UserRole.SRE]))],
 )
-def register_server(payload: ServerCreate, db: Session = Depends(get_db)):
-    """Register a new server/instance/container host to be monitored."""
-    server = Server(**payload.model_dump(), api_key=secrets.token_hex(32))
+def register_server(
+    payload: ServerCreate,
+    db: Session = Depends(get_db),
+):
+    """
+    Register a new server.
+
+    A server is considered a duplicate when both its
+    hostname and IP address already exist.
+    """
+
+    existing = (
+        db.query(Server)
+        .filter(
+            Server.hostname == payload.hostname,
+            Server.ip_address == payload.ip_address,
+        )
+        .first()
+    )
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Server with this hostname and IP address "
+                "is already registered."
+            ),
+        )
+
+    server = Server(
+        **payload.model_dump(),
+        api_key=secrets.token_hex(32),
+    )
+
     db.add(server)
     db.commit()
     db.refresh(server)
+
     return server
 
 
-@router.get("", response_model=list[ServerOut])
+@router.get(
+    "",
+    response_model=list[ServerOut],
+)
 def list_servers(
     environment: str | None = None,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
     query = db.query(Server)
+
     if environment:
-        query = query.filter(Server.environment == environment)
+        query = query.filter(
+            Server.environment == environment
+        )
+
     return query.order_by(Server.hostname).all()
 
 
-@router.get("/{server_id}", response_model=ServerOut)
-def get_server(server_id: uuid.UUID, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+@router.get(
+    "/{server_id}",
+    response_model=ServerOut,
+)
+def get_server(
+    server_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
     server = db.get(Server, server_id)
+
     if not server:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Server not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Server not found",
+        )
+
     return server
 
 
@@ -53,14 +112,59 @@ def get_server(server_id: uuid.UUID, db: Session = Depends(get_db), _: User = De
     response_model=ServerOut,
     dependencies=[Depends(require_roles([UserRole.ADMIN, UserRole.SRE]))],
 )
-def update_server(server_id: uuid.UUID, payload: ServerUpdate, db: Session = Depends(get_db)):
+def update_server(
+    server_id: uuid.UUID,
+    payload: ServerUpdate,
+    db: Session = Depends(get_db),
+):
     server = db.get(Server, server_id)
+
     if not server:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Server not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Server not found",
+        )
+
+    for field, value in payload.model_dump(
+        exclude_unset=True
+    ).items():
         setattr(server, field, value)
+
     db.commit()
     db.refresh(server)
+
+    return server
+
+
+@router.post(
+    "/{server_id}/regenerate-api-key",
+    response_model=ServerRegisteredOut,
+    dependencies=[Depends(require_roles([UserRole.ADMIN]))],
+)
+def regenerate_api_key(
+    server_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """
+    Generate a new API key for an existing server.
+
+    The new API key is returned only in this response.
+    The old API key immediately becomes invalid.
+    """
+
+    server = db.get(Server, server_id)
+
+    if not server:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Server not found",
+        )
+
+    server.api_key = secrets.token_hex(32)
+
+    db.commit()
+    db.refresh(server)
+
     return server
 
 
@@ -69,9 +173,17 @@ def update_server(server_id: uuid.UUID, payload: ServerUpdate, db: Session = Dep
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_roles([UserRole.ADMIN]))],
 )
-def delete_server(server_id: uuid.UUID, db: Session = Depends(get_db)):
+def delete_server(
+    server_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
     server = db.get(Server, server_id)
+
     if not server:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Server not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Server not found",
+        )
+
     db.delete(server)
     db.commit()
