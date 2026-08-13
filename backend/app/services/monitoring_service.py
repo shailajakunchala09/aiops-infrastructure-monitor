@@ -1,4 +1,4 @@
-"""
+﻿"""
 Core AIOps logic: evaluates incoming metrics/logs against thresholds,
 raises Alerts, and auto-creates Incidents when conditions warrant it.
 
@@ -98,48 +98,31 @@ def _update_server_status(
     metric: Metric,
 ) -> None:
     """
-    Demo fleet status configuration.
+    Update server status from the latest real metric values.
 
-    prod-api-01       -> HEALTHY
-    prod-db-01        -> HEALTHY
-    prod-web-01       -> WARNING
-    staging-web-01    -> CRITICAL
-
-    For any other server, normal threshold-based monitoring
-    remains active.
+    Status is calculated from the server's configured thresholds.
+    Every valid metric sample also refreshes the server heartbeat.
     """
 
-    demo_statuses = {
-        "prod-api-01": ServerStatus.HEALTHY,
-        "prod-db-01": ServerStatus.HEALTHY,
-        "prod-web-01": ServerStatus.WARNING,
-        "staging-web-01": ServerStatus.CRITICAL,
-    }
+    if (
+        metric.cpu_percent >= server.cpu_threshold
+        or metric.memory_percent >= server.memory_threshold
+        or metric.disk_percent >= server.disk_threshold
+    ):
+        server.status = ServerStatus.CRITICAL
 
-    if server.hostname in demo_statuses:
-        server.status = demo_statuses[server.hostname]
+    elif (
+        metric.cpu_percent >= server.cpu_threshold * 0.85
+        or metric.memory_percent >= server.memory_threshold * 0.85
+        or metric.disk_percent >= server.disk_threshold * 0.85
+    ):
+        server.status = ServerStatus.WARNING
 
     else:
-        # Normal threshold-based behavior for other servers.
-        if (
-            metric.cpu_percent >= server.cpu_threshold
-            or metric.memory_percent >= server.memory_threshold
-            or metric.disk_percent >= server.disk_threshold
-        ):
-            server.status = ServerStatus.CRITICAL
-
-        elif (
-            metric.cpu_percent >= server.cpu_threshold * 0.85
-            or metric.memory_percent >= server.memory_threshold * 0.85
-        ):
-            server.status = ServerStatus.WARNING
-
-        else:
-            server.status = ServerStatus.HEALTHY
+        server.status = ServerStatus.HEALTHY
 
     # Every valid metric sample means the server is alive.
     server.last_heartbeat_at = datetime.utcnow()
-
 
 def _maybe_open_incident_for_alerts(
     db: Session,
