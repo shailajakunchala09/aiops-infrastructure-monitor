@@ -113,7 +113,8 @@ cp backend/.env.example backend/.env
 
 docker compose up --build
 ```
-Dashboard: https://aiops-frontend-zw3x.onrender.com
+Dashboard: https://aiops-frontend-public.onrender.com/login#/
+
 API + Swagger docs: https://aiops-infrastructure-monitor.onrender.com/api/docs
 
 Full setup instructions (Docker and non-Docker paths):
