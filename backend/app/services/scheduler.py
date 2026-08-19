@@ -1,99 +1,120 @@
 """
-Background monitoring scheduler for the public AIOps demo.
+Free public demo monitoring scheduler.
 
-Generates healthy demo metrics for registered demo servers so that
-the public Render deployment continuously has:
-- HEALTHY server status
-- Performance metrics
-- Updated heartbeats
+Generates demo metrics and logs directly in the existing
+Render PostgreSQL database.
 """
 
 import asyncio
-from datetime import datetime
+import uuid
+from datetime import datetime, timezone
 
-from app.core.config import settings
-from app.core.logging_config import logger
+from sqlalchemy.orm import Session
+
 from app.db.session import SessionLocal
+from app.core.logging_config import logger
 from app.models.server import Server, ServerStatus
 from app.models.metric import Metric
-from app.services.monitoring_service import evaluate_metric_thresholds
+from app.models.log_entry import LogEntry, LogLevel
 
 
-HEALTHY_METRICS = {
-    "cpu_percent": 35.0,
-    "memory_percent": 40.0,
-    "disk_percent": 45.0,
-    "network_in_kbps": 100.0,
-    "network_out_kbps": 50.0,
-    "load_average_1m": 1.0,
-    "process_count": 120,
-}
+INTERVAL = 30
 
 
-async def generate_demo_metrics() -> None:
-    """Generate healthy metrics for all registered servers."""
+def generate_demo_data(db: Session) -> None:
+    servers = db.query(Server).all()
 
-    db = SessionLocal()
+    if not servers:
+        logger.warning("No servers found for demo monitoring")
+        return
 
-    try:
-        servers = db.query(Server).all()
+    for server in servers:
+        now = datetime.now(timezone.utc)
 
-        for server in servers:
-            metric = Metric(
+        server.status = ServerStatus.HEALTHY
+        server.last_heartbeat_at = now
+
+        db.add(
+            Metric(
                 server_id=server.id,
-                **HEALTHY_METRICS,
+                cpu_percent=35.0,
+                memory_percent=40.0,
+                disk_percent=45.0,
+                network_in_kbps=100.0,
+                network_out_kbps=50.0,
+                load_average_1m=1.0,
+                process_count=120,
             )
-
-            db.add(metric)
-            db.flush()
-
-            evaluate_metric_thresholds(
-                db,
-                server,
-                metric,
-            )
-
-        db.commit()
-
-        logger.info(
-            "Generated HEALTHY metrics for %s servers",
-            len(servers),
         )
 
-    except Exception as exc:
-        db.rollback()
-
-        logger.error(
-            "Demo metric generation failed: %s",
-            exc,
+        db.add(
+            LogEntry(
+                server_id=server.id,
+                source_application="public-monitoring-agent",
+                level=LogLevel.INFO,
+                message=(
+                    f"Health check completed successfully for "
+                    f"{server.hostname}. All monitored resources "
+                    "are operating within normal limits."
+                ),
+                trace_id=str(uuid.uuid4()),
+            )
         )
 
-    finally:
-        db.close()
+        db.add(
+            LogEntry(
+                server_id=server.id,
+                source_application="public-monitoring-agent",
+                level=LogLevel.WARNING,
+                message=(
+                    f"Routine monitoring warning on {server.hostname}: "
+                    "connection latency briefly exceeded the normal baseline."
+                ),
+                trace_id=str(uuid.uuid4()),
+            )
+        )
+
+        db.add(
+            LogEntry(
+                server_id=server.id,
+                source_application="public-monitoring-agent",
+                level=LogLevel.ERROR,
+                message=(
+                    f"Recoverable application error detected on "
+                    f"{server.hostname}: temporary downstream service "
+                    "timeout. Retry succeeded."
+                ),
+                trace_id=str(uuid.uuid4()),
+            )
+        )
+
+    db.commit()
+
+    logger.info(
+        "Public demo monitoring: generated metrics and logs for %d servers",
+        len(servers),
+    )
 
 
 async def start_background_scheduler() -> None:
-    """
-    Continuously generate healthy demo metrics.
+    """Runs inside the existing Render Web Service."""
 
-    This keeps the public Render demo populated with live-looking
-    performance data and current server heartbeats.
-    """
-
-    logger.info(
-        "Public AIOps monitoring scheduler started"
-    )
+    logger.info("Background demo monitoring scheduler started")
 
     while True:
+        db = SessionLocal()
+
         try:
-            await generate_demo_metrics()
+            generate_demo_data(db)
 
         except Exception as exc:
+            db.rollback()
             logger.error(
-                "Scheduler iteration failed: %s",
+                "Demo monitoring scheduler failed: %s",
                 exc,
             )
 
-        await asyncio.sleep(
-            settings.ALERT_EVALUATION_INTERVAL_SECONDS
-        )
+        finally:
+            db.close()
+
+        await asyncio.sleep(INTERVAL)
