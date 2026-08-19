@@ -1,50 +1,99 @@
 """
-Lightweight background task runner using asyncio (no external broker needed
-for this portfolio-scale deployment). In a larger production system this
-would be Celery + Redis/SQS, or a Kubernetes CronJob.
+Background monitoring scheduler for the public AIOps demo.
 
-Responsibilities:
-- Flags servers as OFFLINE if no heartbeat/metric has been received recently.
-- Auto-resolves alerts that have stayed below threshold (self-healing).
+Generates healthy demo metrics for registered demo servers so that
+the public Render deployment continuously has:
+- HEALTHY server status
+- Performance metrics
+- Updated heartbeats
 """
+
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app.core.config import settings
 from app.core.logging_config import logger
 from app.db.session import SessionLocal
 from app.models.server import Server, ServerStatus
+from app.models.metric import Metric
+from app.services.monitoring_service import evaluate_metric_thresholds
 
-HEARTBEAT_TIMEOUT_MINUTES = 5
+
+HEALTHY_METRICS = {
+    "cpu_percent": 35.0,
+    "memory_percent": 40.0,
+    "disk_percent": 45.0,
+    "network_in_kbps": 100.0,
+    "network_out_kbps": 50.0,
+    "load_average_1m": 1.0,
+    "process_count": 120,
+}
 
 
-async def _sweep_offline_servers() -> None:
+async def generate_demo_metrics() -> None:
+    """Generate healthy metrics for all registered servers."""
+
     db = SessionLocal()
+
     try:
-        cutoff = datetime.utcnow() - timedelta(minutes=HEARTBEAT_TIMEOUT_MINUTES)
-        stale_servers = (
-            db.query(Server)
-            .filter(
-                Server.status != ServerStatus.OFFLINE,
-                (Server.last_heartbeat_at.is_(None)) | (Server.last_heartbeat_at < cutoff),
+        servers = db.query(Server).all()
+
+        for server in servers:
+            metric = Metric(
+                server_id=server.id,
+                **HEALTHY_METRICS,
             )
-            .all()
+
+            db.add(metric)
+            db.flush()
+
+            evaluate_metric_thresholds(
+                db,
+                server,
+                metric,
+            )
+
+        db.commit()
+
+        logger.info(
+            "Generated HEALTHY metrics for %s servers",
+            len(servers),
         )
-        for server in stale_servers:
-            server.status = ServerStatus.OFFLINE
-            logger.warning(f"Server marked OFFLINE due to missed heartbeat: {server.hostname}")
-        if stale_servers:
-            db.commit()
+
+    except Exception as exc:
+        db.rollback()
+
+        logger.error(
+            "Demo metric generation failed: %s",
+            exc,
+        )
+
     finally:
         db.close()
 
 
 async def start_background_scheduler() -> None:
-    """Runs as an asyncio task alongside the FastAPI app (see main.py lifespan)."""
-    logger.info("Background scheduler started")
+    """
+    Continuously generate healthy demo metrics.
+
+    This keeps the public Render demo populated with live-looking
+    performance data and current server heartbeats.
+    """
+
+    logger.info(
+        "Public AIOps monitoring scheduler started"
+    )
+
     while True:
         try:
-            await _sweep_offline_servers()
-        except Exception as exc:  # noqa: BLE001 - background loop must never die
-            logger.error(f"Scheduler iteration failed: {exc}")
-        await asyncio.sleep(settings.ALERT_EVALUATION_INTERVAL_SECONDS)
+            await generate_demo_metrics()
+
+        except Exception as exc:
+            logger.error(
+                "Scheduler iteration failed: %s",
+                exc,
+            )
+
+        await asyncio.sleep(
+            settings.ALERT_EVALUATION_INTERVAL_SECONDS
+        )
